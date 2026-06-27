@@ -421,40 +421,11 @@
 // ═══════════════════════════════════════════════════════
 const PW_STORAGE_KEY = "presensi_users_pw";
 
-// Load custom passwords (if any) from localStorage
-function getUsers(){
-  const saved = localStorage.getItem(PW_STORAGE_KEY);
-  if(saved){
-    try{ return JSON.parse(saved); }catch(e){}
-  }
-  return {"admin":"presensi123","operator":"presensi456"};
-}
-function saveUsers(obj){
-  localStorage.setItem(PW_STORAGE_KEY, JSON.stringify(obj));
-}
+// getUsers / saveUsers → digantikan oleh versi async Firebase di bawah
 
 const SESSION_KEY = "presensi_session";
 
-function doLogin(){
-  const u = document.getElementById("loginUser").value.trim();
-  const p = document.getElementById("loginPass").value;
-  const err = document.getElementById("loginErr");
-  const USERS = getUsers();
-  if(USERS[u] && USERS[u]===p){
-    err.style.display="none";
-    sessionStorage.setItem(SESSION_KEY, u);
-    const scr=document.getElementById("loginScreen");
-    scr.classList.add("hide");
-    setTimeout(()=>{scr.style.display="none";},400);
-    document.getElementById("loggedUser").textContent="👤 "+u;
-    document.getElementById("loggedUser").style.display="inline-flex";
-    document.getElementById("btnLogout").style.display="inline-block";
-  } else {
-    err.style.display="block";
-    document.getElementById("loginPass").value="";
-    document.getElementById("loginPass").focus();
-  }
-}
+// doLogin → digantikan oleh versi async Firebase di bawah
 
 function doLogout(){
   if(!confirm("Keluar dari aplikasi?")) return;
@@ -486,36 +457,7 @@ function openResetPw(){
 function closeResetPw(){
   document.getElementById("resetPwModal").classList.remove("show");
 }
-function doResetPw(){
-  const u=document.getElementById("rpUser").value.trim();
-  const old=document.getElementById("rpOld").value;
-  const nw=document.getElementById("rpNew").value;
-  const cf=document.getElementById("rpConfirm").value;
-  const errEl=document.getElementById("resetPwErr");
-  const okEl=document.getElementById("resetPwOk");
-  errEl.style.display="none"; okEl.style.display="none";
-
-  const USERS=getUsers();
-  if(!u||!old||!nw||!cf){
-    errEl.textContent="Semua kolom wajib diisi.";errEl.style.display="block";return;
-  }
-  if(!USERS[u]||USERS[u]!==old){
-    errEl.textContent="Username atau password lama tidak sesuai.";errEl.style.display="block";return;
-  }
-  if(nw.length<6){
-    errEl.textContent="Password baru minimal 6 karakter.";errEl.style.display="block";return;
-  }
-  if(nw!==cf){
-    errEl.textContent="Konfirmasi password tidak cocok.";errEl.style.display="block";return;
-  }
-  USERS[u]=nw;
-  saveUsers(USERS);
-  okEl.textContent="✅ Password berhasil diubah! Silakan login ulang.";okEl.style.display="block";
-  document.getElementById("rpOld").value="";
-  document.getElementById("rpNew").value="";
-  document.getElementById("rpConfirm").value="";
-  setTimeout(closeResetPw, 2200);
-}
+// doResetPw → digantikan oleh versi async Firebase di bawah
 
 function showLoading(msg){
   document.getElementById("loadingText").textContent=msg||"Memuat...";
@@ -750,22 +692,18 @@ let kuotaManual = {}; // {"nama": N} — kuota ambil libur tambahan manual per p
 const DB_KEY_PREFIX = "presensi_db_v2_";
 const BONUS_POOL_KEY = "presensi_bonus_pool_v1"; // lintas bulan
 
-function getDbKey(bulan, tahun){
+window.getDbKey = function(bulan, tahun){
   const b=bulan||document.getElementById("sBulan").value;
   const t=tahun||document.getElementById("sTahun").value;
   return `${DB_KEY_PREFIX}${t}_${String(b).padStart(2,"0")}`;
 }
+function getDbKey(b2,t2){ return window.getDbKey(b2,t2); }
 
 // ── Bonus Pool (lintas bulan) ──────────────────────────
-// Format: { "NamaPegawai": { earned: N, usedByMonth: {"2025_01": N, ...} } }
-function getBonusPool(){
-  try{ return JSON.parse(localStorage.getItem(BONUS_POOL_KEY)||"{}"); }
-  catch(e){ return {}; }
-}
-function saveBonusPool(pool){
-  try{ localStorage.setItem(BONUS_POOL_KEY, JSON.stringify(pool)); }
-  catch(e){ console.warn("saveBonusPool error:",e); }
-}
+// getBonusPool / saveBonusPool → digantikan oleh versi async Firebase di bawah
+// Versi sync fallback (dipakai sebelum Firebase siap)
+function getBonusPool(){ return {}; }
+function saveBonusPool(pool){ if(window.saveBonusPool && window.saveBonusPool!==saveBonusPool) window.saveBonusPool(pool); }
 
 // Dipanggil setelah hitungSekarang — update pool dari summaryMap bulan ini
 function updateBonusPool(){
@@ -799,117 +737,13 @@ function getBonusSisaLintas(nama){
 let _activeBulan = null;
 let _activeTahun = null;
 
-function saveDB(){
-  try{
-    const data={
-      rows, submitted, tanggalMerah, tanggalCuti, keteranganTH, ambilLiburUsed, kuotaManual,
-      settings:{
-        bulan: document.getElementById("sBulan").value,
-        tahun: document.getElementById("sTahun").value,
-        jamMasuk: document.getElementById("sJamMasuk").value,
-        jamPulang: document.getElementById("sJamPulang").value,
-        istirahat: document.getElementById("sIstirahat").value,
-      },
-      savedAt: new Date().toISOString()
-    };
-    const key=getDbKey();
-    localStorage.setItem(key, JSON.stringify(data));
-    localStorage.setItem("presensi_last_key", key);
-    _showSaveIndicator();
-  }catch(e){console.warn("saveDB error:",e);}
-}
+// saveDB → digantikan oleh versi async Firebase di bawah
 
-function loadDB(bulan, tahun){
-  try{
-    const key=getDbKey(bulan, tahun);
-    const raw=localStorage.getItem(key);
-    if(!raw) return false;
-    const data=JSON.parse(raw);
-    if(data.settings){
-      if(data.settings.jamMasuk) document.getElementById("sJamMasuk").value=data.settings.jamMasuk;
-      if(data.settings.jamPulang) document.getElementById("sJamPulang").value=data.settings.jamPulang;
-      if(data.settings.istirahat) document.getElementById("sIstirahat").value=data.settings.istirahat;
-    }
-    if(data.rows && data.rows.length) rows=data.rows;
-    if(data.tanggalMerah) tanggalMerah=data.tanggalMerah;
-    if(data.tanggalCuti) tanggalCuti=data.tanggalCuti;
-    if(data.keteranganTH) keteranganTH=data.keteranganTH;
-    if(data.ambilLiburUsed) ambilLiburUsed=data.ambilLiburUsed;
-    if(data.kuotaManual) kuotaManual=data.kuotaManual;
-    if(data.submitted) submitted=data.submitted;
-    return data.savedAt||true;
-  }catch(e){console.warn("loadDB error:",e); return false;}
-}
+// loadDB → digantikan oleh versi async Firebase di bawah
 
-function clearDB(){
-  if(!confirm("Hapus semua data tersimpan bulan ini? Tindakan ini tidak bisa dibatalkan.")) return;
-  const key=getDbKey();
-  localStorage.removeItem(key);
-  rows=[{nama:"",tanggal:"",jamMasuk:"",jamPulang:""}];
-  submitted=false; _summaryMap={}; keteranganTH={}; ambilLiburUsed={}; kuotaManual={};
-  tanggalMerah={}; tanggalCuti={};
-  invalidateHKCache();
-  document.getElementById("sJamMasuk").value="08:00";
-  document.getElementById("sJamPulang").value="17:00";
-  document.getElementById("sIstirahat").value="60";
-  onSettingChange();
-  renderTglMerah(); renderTglCuti(); renderRows();
-  renderSummary(); renderKalender();
-  switchTab("input");
-  showNotif("success","Data berhasil dihapus","Semua data bulan ini telah dikosongkan");
-}
+// clearDB → digantikan oleh versi async Firebase di bawah
 
-// Dipanggil saat user ganti bulan/tahun — simpan bulan lama, muat bulan baru
-function onBulanChange(){
-  const newB=+document.getElementById("sBulan").value;
-  const newT=+document.getElementById("sTahun").value;
-
-  if(_activeBulan!==null && (newB!==_activeBulan || newT!==_activeTahun)){
-    showLoading(`Memuat ${BULAN_NAMES[newB-1]} ${newT}...`);
-    setTimeout(()=>{
-      // Simpan data bulan lama dulu
-      const oldKey=getDbKey(_activeBulan, _activeTahun);
-      try{
-        const oldData={
-          rows, submitted, tanggalMerah, tanggalCuti, keteranganTH, ambilLiburUsed, kuotaManual,
-          settings:{
-            bulan:_activeBulan, tahun:_activeTahun,
-            jamMasuk: document.getElementById("sJamMasuk").value,
-            jamPulang: document.getElementById("sJamPulang").value,
-            istirahat: document.getElementById("sIstirahat").value,
-          },
-          savedAt: new Date().toISOString()
-        };
-        localStorage.setItem(oldKey, JSON.stringify(oldData));
-      }catch(e){console.warn("save old month error:",e);}
-
-      // Reset state untuk bulan baru
-      rows=[{nama:"",tanggal:"",jamMasuk:"",jamPulang:""}];
-      submitted=false; _summaryMap={}; keteranganTH={}; ambilLiburUsed={}; kuotaManual={};
-      tanggalMerah={}; tanggalCuti={};
-      invalidateHKCache();
-
-      const loaded=loadDB(newB, newT);
-      _activeBulan=newB; _activeTahun=newT;
-
-      onSettingChange();
-      renderTglMerah(); renderTglCuti(); renderRows();
-      if(loaded && submitted){
-        _summaryMap=buildSummaryMap();
-        renderSummary(); renderKalender();
-        showNotif("success",`✅ Data ${BULAN_NAMES[newB-1]} ${newT} dimuat`,
-          typeof loaded==="string"?`Terakhir disimpan: ${new Date(loaded).toLocaleString("id-ID")}`:"");
-      } else {
-        switchTab("input");
-        showNotif("success",`📂 Bulan baru dibuka: ${BULAN_NAMES[newB-1]} ${newT}`,`Data bulan sebelumnya tersimpan otomatis`);
-      }
-      hideLoading();
-    },30);
-    return;
-  }
-  _activeBulan=newB; _activeTahun=newT;
-  onSettingChange();
-}
+// onBulanChange → digantikan oleh versi async Firebase di bawah
 
 let _saveTimer=null;
 function autoSave(){
@@ -2356,45 +2190,271 @@ async function exportPDFperPegawai(){
 }
 window.onload=()=>{
   checkSession();
-
   const now=new Date();
   const initB=now.getMonth()+1;
   const initT=now.getFullYear();
   document.getElementById("sBulan").value=initB;
   document.getElementById("sTahun").value=initT;
-
-  // Cek apakah ada data lama format v1 — migrasi sekali
-  const oldRaw=localStorage.getItem("presensi_db_v1");
-  if(oldRaw){
-    try{
-      const oldData=JSON.parse(oldRaw);
-      const migB=oldData.settings?.bulan||initB;
-      const migT=oldData.settings?.tahun||initT;
-      const migKey=`${DB_KEY_PREFIX}${migT}_${String(migB).padStart(2,"0")}`;
-      if(!localStorage.getItem(migKey)){
-        localStorage.setItem(migKey, oldRaw);
-      }
-      localStorage.removeItem("presensi_db_v1");
-    }catch(e){}
-  }
-
-  showLoading("Memuat aplikasi...");
-  setTimeout(()=>{
+  showLoading("Menghubungkan ke database...");
+  initFirebase().then(()=>{
     _activeBulan=initB; _activeTahun=initT;
-    const loaded=loadDB(initB, initT);
+    loadDB(initB, initT).then(loaded=>{
+      onSettingChange();
+      renderTglMerah();
+      renderTglCuti();
+      renderRows();
+      if(loaded && submitted){
+        _summaryMap=buildSummaryMap();
+        renderSummary();
+        renderKalender();
+        showNotif("success","✅ Data berhasil dimuat dari database",
+          typeof loaded==="string"?`Terakhir disimpan: ${new Date(loaded).toLocaleString("id-ID")}`:"");
+      }
+      hideLoading();
+    });
+  }).catch(err=>{
+    hideLoading();
+    showNotif("error","⚠️ Gagal terhubung ke Firebase","Periksa koneksi internet Anda: "+err.message);
+  });
+};
+</script>
+
+<!-- ══ FIREBASE INTEGRATION ══════════════════════════════ -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, setDoc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCYpATsyy1ptlvmcwwYO-bOmsn7CgEcL7I",
+  authDomain: "presensi-3e4a4.firebaseapp.com",
+  projectId: "presensi-3e4a4",
+  storageBucket: "presensi-3e4a4.firebasestorage.app",
+  messagingSenderId: "289605041798",
+  appId: "1:289605041798:web:81a86f599472d3d6d55b07",
+  measurementId: "G-TQ8SFG269B"
+};
+
+let _db = null;
+
+// ── Expose fungsi ke global scope ─────────────────────────
+window.initFirebase = async function(){
+  try{
+    const app = initializeApp(firebaseConfig);
+    _db = getFirestore(app);
+    console.log("✅ Firebase terhubung");
+  }catch(e){
+    console.error("Firebase init error:", e);
+    throw e;
+  }
+};
+
+// ── SIMPAN DATA UTAMA ──────────────────────────────────────
+window.saveDB = async function(){
+  if(!_db){ console.warn("DB belum siap"); return; }
+  try{
+    const data={
+      rows, submitted, tanggalMerah, tanggalCuti,
+      keteranganTH, ambilLiburUsed, kuotaManual,
+      settings:{
+        bulan: document.getElementById("sBulan").value,
+        tahun: document.getElementById("sTahun").value,
+        jamMasuk: document.getElementById("sJamMasuk").value,
+        jamPulang: document.getElementById("sJamPulang").value,
+        istirahat: document.getElementById("sIstirahat").value,
+      },
+      savedAt: new Date().toISOString()
+    };
+    const key = window.getDbKey();
+    await setDoc(doc(_db, "presensi", key), data);
+    _showSaveIndicator();
+  }catch(e){ console.warn("saveDB error:",e); }
+};
+
+// ── MUAT DATA UTAMA ────────────────────────────────────────
+window.loadDB = async function(bulan, tahun){
+  if(!_db) return false;
+  try{
+    const key = window.getDbKey(bulan, tahun);
+    const snap = await getDoc(doc(_db, "presensi", key));
+    if(!snap.exists()) return false;
+    const data = snap.data();
+    if(data.settings){
+      if(data.settings.jamMasuk) document.getElementById("sJamMasuk").value=data.settings.jamMasuk;
+      if(data.settings.jamPulang) document.getElementById("sJamPulang").value=data.settings.jamPulang;
+      if(data.settings.istirahat) document.getElementById("sIstirahat").value=data.settings.istirahat;
+    }
+    if(data.rows && data.rows.length) rows=data.rows;
+    if(data.tanggalMerah) tanggalMerah=data.tanggalMerah;
+    if(data.tanggalCuti) tanggalCuti=data.tanggalCuti;
+    if(data.keteranganTH) keteranganTH=data.keteranganTH;
+    if(data.ambilLiburUsed) ambilLiburUsed=data.ambilLiburUsed;
+    if(data.kuotaManual) kuotaManual=data.kuotaManual;
+    if(data.submitted) submitted=data.submitted;
+    return data.savedAt||true;
+  }catch(e){ console.warn("loadDB error:",e); return false; }
+};
+
+// ── HAPUS DATA BULAN ────────────────────────────────────────
+window.clearDBFirebase = async function(){
+  if(!_db) return;
+  try{
+    const key = window.getDbKey();
+    await deleteDoc(doc(_db, "presensi", key));
+  }catch(e){ console.warn("clearDB error:",e); }
+};
+
+// ── SIMPAN BONUS POOL ──────────────────────────────────────
+window.saveBonusPool = async function(pool){
+  if(!_db) return;
+  try{
+    await setDoc(doc(_db, "config", "bonus_pool"), { data: JSON.stringify(pool) });
+  }catch(e){ console.warn("saveBonusPool error:",e); }
+};
+
+window.getBonusPool = async function(){
+  if(!_db) return {};
+  try{
+    const snap = await getDoc(doc(_db, "config", "bonus_pool"));
+    if(!snap.exists()) return {};
+    return JSON.parse(snap.data().data||"{}");
+  }catch(e){ return {}; }
+};
+
+// ── SIMPAN PASSWORD USERS ──────────────────────────────────
+window.saveUsers = async function(obj){
+  if(!_db) return;
+  try{
+    await setDoc(doc(_db, "config", "users"), { data: JSON.stringify(obj) });
+  }catch(e){ console.warn("saveUsers error:",e); }
+};
+
+window.getUsers = async function(){
+  if(!_db) return {"admin":"presensi123","operator":"presensi456"};
+  try{
+    const snap = await getDoc(doc(_db, "config", "users"));
+    if(!snap.exists()) return {"admin":"presensi123","operator":"presensi456"};
+    return JSON.parse(snap.data().data||"{}");
+  }catch(e){ return {"admin":"presensi123","operator":"presensi456"}; }
+};
+</script>
+
+<script>
+// ── Override clearDB agar juga hapus dari Firestore ────────
+const _origClearDB = window.clearDB;
+window.clearDB = async function(){
+  if(!confirm("Hapus semua data tersimpan bulan ini? Tindakan ini tidak bisa dibatalkan.")) return;
+  showLoading("Menghapus data...");
+  await window.clearDBFirebase();
+  rows=[{nama:"",tanggal:"",jamMasuk:"",jamPulang:""}];
+  submitted=false; _summaryMap={}; keteranganTH={}; ambilLiburUsed={}; kuotaManual={};
+  tanggalMerah={}; tanggalCuti={};
+  invalidateHKCache();
+  document.getElementById("sJamMasuk").value="08:00";
+  document.getElementById("sJamPulang").value="17:00";
+  document.getElementById("sIstirahat").value="60";
+  onSettingChange();
+  renderTglMerah(); renderTglCuti(); renderRows();
+  renderSummary(); renderKalender();
+  switchTab("input");
+  hideLoading();
+  showNotif("success","Data berhasil dihapus","Semua data bulan ini telah dikosongkan");
+};
+
+// ── Override doLogin agar pakai Firestore async ─────────────
+window.doLogin = async function(){
+  const u = document.getElementById("loginUser").value.trim();
+  const p = document.getElementById("loginPass").value;
+  const err = document.getElementById("loginErr");
+  showLoading("Memeriksa login...");
+  const USERS = await window.getUsers();
+  hideLoading();
+  if(USERS[u] && USERS[u]===p){
+    err.style.display="none";
+    sessionStorage.setItem(SESSION_KEY, u);
+    const scr=document.getElementById("loginScreen");
+    scr.classList.add("hide");
+    setTimeout(()=>{scr.style.display="none";},400);
+    document.getElementById("loggedUser").textContent="👤 "+u;
+    document.getElementById("loggedUser").style.display="inline-flex";
+    document.getElementById("btnLogout").style.display="inline-block";
+  } else {
+    err.style.display="block";
+    document.getElementById("loginPass").value="";
+    document.getElementById("loginPass").focus();
+  }
+};
+
+// ── Override doResetPw agar pakai Firestore async ───────────
+window.doResetPw = async function(){
+  const u=document.getElementById("rpUser").value.trim();
+  const old=document.getElementById("rpOld").value;
+  const nw=document.getElementById("rpNew").value;
+  const cf=document.getElementById("rpConfirm").value;
+  const errEl=document.getElementById("resetPwErr");
+  const okEl=document.getElementById("resetPwOk");
+  errEl.style.display="none"; okEl.style.display="none";
+  if(!u||!old||!nw||!cf){
+    errEl.textContent="Semua kolom wajib diisi.";errEl.style.display="block";return;
+  }
+  if(nw.length<6){
+    errEl.textContent="Password baru minimal 6 karakter.";errEl.style.display="block";return;
+  }
+  if(nw!==cf){
+    errEl.textContent="Konfirmasi password tidak cocok.";errEl.style.display="block";return;
+  }
+  showLoading("Memverifikasi password...");
+  const USERS = await window.getUsers();
+  hideLoading();
+  if(!USERS[u]||USERS[u]!==old){
+    errEl.textContent="Username atau password lama tidak sesuai.";errEl.style.display="block";return;
+  }
+  USERS[u]=nw;
+  await window.saveUsers(USERS);
+  okEl.textContent="✅ Password berhasil diubah! Silakan login ulang.";okEl.style.display="block";
+  document.getElementById("rpOld").value="";
+  document.getElementById("rpNew").value="";
+  document.getElementById("rpConfirm").value="";
+  setTimeout(closeResetPw, 2200);
+};
+
+// ── Override onBulanChange agar async ──────────────────────
+window.onBulanChange = async function(){
+  const newB=+document.getElementById("sBulan").value;
+  const newT=+document.getElementById("sTahun").value;
+
+  if(_activeBulan!==null && (newB!==_activeBulan || newT!==_activeTahun)){
+    showLoading(`Memuat ${BULAN_NAMES[newB-1]} ${newT}...`);
+    // Simpan data bulan lama
+    const oldKey=getDbKey(_activeBulan, _activeTahun);
+    try{
+      // Simpan bulan lama via Firebase
+      await window.saveDB();
+    }catch(e){console.warn("save old month error:",e);}
+
+    // Reset state
+    rows=[{nama:"",tanggal:"",jamMasuk:"",jamPulang:""}];
+    submitted=false; _summaryMap={}; keteranganTH={}; ambilLiburUsed={}; kuotaManual={};
+    tanggalMerah={}; tanggalCuti={};
+    invalidateHKCache();
+
+    const loaded = await loadDB(newB, newT);
+    _activeBulan=newB; _activeTahun=newT;
     onSettingChange();
-    renderTglMerah();
-    renderTglCuti();
-    renderRows();
+    renderTglMerah(); renderTglCuti(); renderRows();
     if(loaded && submitted){
       _summaryMap=buildSummaryMap();
-      renderSummary();
-      renderKalender();
-      showNotif("success","✅ Data berhasil dimuat dari database",
+      renderSummary(); renderKalender();
+      showNotif("success",`✅ Data ${BULAN_NAMES[newB-1]} ${newT} dimuat`,
         typeof loaded==="string"?`Terakhir disimpan: ${new Date(loaded).toLocaleString("id-ID")}`:"");
+    } else {
+      switchTab("input");
+      showNotif("success",`📂 Bulan baru dibuka: ${BULAN_NAMES[newB-1]} ${newT}`,"Data bulan sebelumnya tersimpan otomatis");
     }
     hideLoading();
-  },40);
+    return;
+  }
+  _activeBulan=newB; _activeTahun=newT;
+  onSettingChange();
 };
 </script>
 </body>
